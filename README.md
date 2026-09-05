@@ -2,8 +2,7 @@
 
 Computer vision experiments.
 
-> Short description of the dataset and the questions these experiments explore
-> goes here.
+> Project description
 
 The work happens in `notebooks/`. `src/vpc2/` holds the small amount of code that
 is worth sharing between them.
@@ -69,6 +68,3 @@ uv run ruff format .  # format
 ```
 
 ## Notes
-
-Everything under `src/vpc2/` is currently a stub. Fill the helpers in as the
-notebooks start repeating themselves.
