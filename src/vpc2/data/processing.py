@@ -184,11 +184,17 @@ def audit_image(path: str | Path) -> tuple[bool, bool, str | None]:
     return True, needs_conversion, None
 
 
+def _box_extent(box: YoloBox) -> tuple[float, float, float, float]:
+    return (
+        box.x_center - box.width / 2.0,
+        box.y_center - box.height / 2.0,
+        box.x_center + box.width / 2.0,
+        box.y_center + box.height / 2.0,
+    )
+
+
 def _clip_box(box: YoloBox) -> tuple[YoloBox | None, bool]:
-    x1 = box.x_center - box.width / 2.0
-    y1 = box.y_center - box.height / 2.0
-    x2 = box.x_center + box.width / 2.0
-    y2 = box.y_center + box.height / 2.0
+    x1, y1, x2, y2 = _box_extent(box)
 
     clipped = False
     if min(x1, y1, x2, y2) < 0.0 or max(x1, y1, x2, y2) > 1.0:
@@ -294,7 +300,8 @@ def parse_yolo_label(
                 issues.append(f"{label_path.name}:{line_number}: clipped to [0, 1]")
             box = clipped_box
         else:
-            if not all(0.0 <= value <= 1.0 for value in coords):
+            x1, y1, x2, y2 = _box_extent(box)
+            if min(x1, y1, x2, y2) < 0.0 or max(x1, y1, x2, y2) > 1.0:
                 counters["boxes_dropped"] += 1
                 issues.append(f"{label_path.name}:{line_number}: out of bounds")
                 continue
@@ -344,6 +351,8 @@ def pair_and_clean(
             report.duplicate_stems += 1
             report.warnings.append(f"Duplicate label stem {stem!r}: {[str(p) for p in paths]}")
 
+    report.orphan_images = sum(1 for stem in image_index if stem not in label_index)
+
     valid_images: dict[str, tuple[Path, bool]] = {}
     for stem, image_paths in tqdm(sorted(image_index.items()), desc="Audit images", unit="img"):
         image_path = image_paths[0]
@@ -368,7 +377,6 @@ def pair_and_clean(
     ):
         label_paths = label_index.get(stem, [])
         if not label_paths:
-            report.orphan_images += 1
             continue
 
         label_path = label_paths[0]
@@ -459,9 +467,13 @@ def write_processed_dataset(
     class_names: Sequence[str],
 ) -> Path:
     root = Path(processed_dir)
+    gitkeep = root / ".gitkeep"
+    had_gitkeep = gitkeep.is_file()
     if root.exists():
         shutil.rmtree(root)
     root.mkdir(parents=True, exist_ok=True)
+    if had_gitkeep:
+        gitkeep.touch()
 
     for split_name, samples in splits.items():
         for sample in tqdm(samples, desc=f"Write {split_name}", unit="img"):

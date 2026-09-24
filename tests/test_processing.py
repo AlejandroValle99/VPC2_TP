@@ -8,6 +8,7 @@ from vpc2.data.processing import (
     parse_yolo_label,
     run_pipeline,
     stratified_split,
+    write_processed_dataset,
 )
 
 
@@ -48,6 +49,17 @@ def test_parse_empty_label(tmp_path: Path) -> None:
     boxes, _counters, issues = parse_yolo_label(label, num_classes=2)
     assert boxes == []
     assert any("empty_label" in issue for issue in issues)
+
+
+def test_parse_yolo_label_drops_out_of_bounds_when_not_clipping(tmp_path: Path) -> None:
+    label = tmp_path / "sample.txt"
+    label.write_text("0 0.95 0.5 0.2 0.2\n0 0.5 0.5 0.2 0.2\n", encoding="utf-8")
+
+    boxes, counters, issues = parse_yolo_label(label, num_classes=2, clip_out_of_bounds=False)
+
+    assert [box.class_id for box in boxes] == [0]
+    assert counters["boxes_dropped"] == 1
+    assert any("out of bounds" in issue for issue in issues)
 
 
 def test_stratified_split_is_reproducible() -> None:
@@ -109,6 +121,28 @@ def _make_raw_dataset(root: Path) -> Path:
     return dataset
 
 
+def test_write_processed_dataset_preserves_gitkeep(tmp_path: Path) -> None:
+    processed = tmp_path / "processed"
+    processed.mkdir()
+    (processed / ".gitkeep").touch()
+    (processed / "stale_file.txt").write_text("old", encoding="utf-8")
+
+    image_path = tmp_path / "s0.jpg"
+    _write_jpeg(image_path)
+    sample = PairedSample(
+        stem="s0",
+        image_path=image_path,
+        label_path=tmp_path / "s0.txt",
+        boxes=[YoloBox(class_id=0, x_center=0.5, y_center=0.5, width=0.2, height=0.2)],
+        converted=False,
+    )
+
+    write_processed_dataset({"train": [sample]}, processed, class_names=["a"])
+
+    assert (processed / ".gitkeep").is_file()
+    assert not (processed / "stale_file.txt").exists()
+
+
 def test_run_pipeline_end_to_end(tmp_path: Path) -> None:
     raw = tmp_path / "raw"
     _make_raw_dataset(raw)
@@ -123,7 +157,7 @@ def test_run_pipeline_end_to_end(tmp_path: Path) -> None:
         ratios=(0.5, 0.25, 0.25),
     )
 
-    assert report.orphan_images == 1
+    assert report.orphan_images == 2  # orphan_image.jpg + corrupt broken.jpg, both label-less
     assert report.orphan_labels == 1
     assert report.images_corrupt == 1
     assert report.empty_labels == 1
