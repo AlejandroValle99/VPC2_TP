@@ -1,11 +1,9 @@
 # VPC2
 
-Computer vision experiments.
-
-> Project description
-
-The work happens in `notebooks/`. `src/vpc2/` holds the small amount of code that
-is worth sharing between them.
+Computer vision pipeline for recyclable waste detection on a conveyor belt
+(CEIA, Visión por Computadora II). The first stage — data processing — audits
+the Roboflow YOLO export, cleans labels, and writes a held-out train/val/test
+split. Shared code lives in `src/vpc2/`; notebooks and scripts call it.
 
 ## Requirements
 
@@ -15,56 +13,82 @@ is worth sharing between them.
 ## Setup
 
 ```bash
-uv sync
+uv sync --group dev
 ```
 
-This creates `.venv/` and installs the project along with its dependencies.
+This creates `.venv/` and installs the project plus pytest/ruff.
 
-## Usage
+## Dataset
+
+Download [GARBAGE CLASSIFICATION 3](https://universe.roboflow.com/material-identification/garbage-classification-3)
+**v2**, YOLOv8 format, and extract it under `data/raw/`. Git ignores that
+directory. Expected layout:
+
+```
+data/raw/<export>/
+  data.yaml
+  train|valid|test/
+    images/
+    labels/
+```
+
+v2 has 10,464 images across six classes: biodegradable, cardboard, glass,
+metal, paper, plastic.
+
+## Data processing
+
+Raw files are never modified. The pipeline writes audit manifests to
+`data/interim/` and a training-ready YOLO layout to `data/processed/`.
 
 ```bash
-uv run jupyter lab
+uv run python scripts/process_data.py
 ```
 
-Because the project is installed in editable mode, notebooks can import the
-helpers directly:
+Same flow in `notebooks/01_data_processing.ipynb` (`uv run jupyter lab`).
 
-```python
-from vpc2.data import io
-from vpc2.utils import visualization as viz
-```
+Outputs:
 
-Put the source images under `data/raw/` — the directory is ignored by git.
+- `data/interim/audit/report.json` — counts, class histogram, warnings
+- `data/processed/data.yaml` — Ultralytics config (train / val / **held-out test**)
+- `data/processed/images/{train,val,test}/` and matching `labels/`
+
+Do not augment the test split.
 
 ## Development
 
 ```bash
-uv sync --group dev   # add the dev tools
 uv run pytest         # tests
 uv run ruff check .   # lint
 uv run ruff format .  # format
+```
+
+Notebooks can import helpers directly (editable install):
+
+```python
+from vpc2.data import io
+from vpc2.data.processing import run_pipeline
 ```
 
 ## Project structure
 
 ```
 .
-├── data/                        # Datasets (not versioned)
-│   ├── raw/                     # Original, immutable data
-│   ├── interim/                 # Intermediate transformations
-│   └── processed/               # Data ready to experiment with
-├── notebooks/                   # The experiments
+├── data/                          # Not versioned
+│   ├── raw/                       # Roboflow export (immutable)
+│   ├── interim/                   # Audit reports
+│   └── processed/                 # Split ready for training
+├── notebooks/
+│   ├── 01_data_processing.ipynb
 │   └── 01_exploration.ipynb
-├── src/vpc2/                    # Helpers shared between notebooks
+├── scripts/
+│   └── process_data.py            # CLI for the data pipeline
+├── src/vpc2/
 │   ├── data/
-│   │   └── io.py                # Listing and loading images
+│   │   ├── io.py                  # List/load images, YAML, discover raw
+│   │   └── processing.py          # Audit, clean labels, split, write
 │   └── utils/
-│       ├── __init__.py          # Seeding
-│       ├── metrics.py           # Evaluation metrics
-│       └── visualization.py     # Image plotting
 ├── tests/
-├── pyproject.toml               # Project metadata and dependencies
+├── reports/                       # Literature notes for the paper
+├── pyproject.toml
 └── README.md
 ```
-
-## Notes
