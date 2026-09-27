@@ -1,0 +1,83 @@
+# Augmentation policy: the single source of truth for training
+# (evidence and previews: notebooks/03_augmentation_analysis.ipynb).
+#
+# Each arm is one experiment of the ablation. `ultralytics` holds ONLY overrides on top of Ultralytics'
+# own defaults; `custom` lists Albumentations transforms handed over through `augmentations=` at train time.
+#
+#   from vpc2.data.augmentation import load_policy
+#   policy = load_policy("proposed")
+#   model.train(data="data/processed/data.yaml", **policy.train_kwargs())
+#
+# Ultralytics parameter names and defaults were checked against ultralytics `main` (cfg/default.yaml and
+# docs) on 2026-09-23. Re-verify against the pinned version when the dependency is added.
+#
+# Caveats (from the Ultralytics docs / still to verify once it is installed):
+#   - With albumentations installed, Ultralytics also applies Blur, MedianBlur, ToGray and CLAHE at p=0.01
+#     in EVERY arm, so "no_augmentation" means "none beyond those".
+#   - Not verified: whether `augmentations=` replaces or extends that default set.
+#   - `auto_augment` is ambiguous in the docs, so no arm sets it. `copy_paste` needs polygon labels and
+#     `erasing` is classification-only; this export is bbox-only, so both stay out.
+#   - Spatial transforms (e.g. RandomRotate90) move boxes correctly in Albumentations (tested in
+#     tests/test_augmentation.py) but are not in any arm until that is confirmed end to end in Ultralytics.
+#
+# Magnitudes below are starting hypotheses for the ablation, not derived optima.
+
+arms:
+  no_augmentation:
+    description: Floor of the ablation. Every Ultralytics augmentation parameter zeroed.
+    ultralytics:
+      hsv_h: 0.0
+      hsv_s: 0.0
+      hsv_v: 0.0
+      degrees: 0.0
+      translate: 0.0
+      scale: 0.0
+      shear: 0.0
+      perspective: 0.0
+      flipud: 0.0
+      fliplr: 0.0
+      bgr: 0.0
+      mosaic: 0.0
+      mixup: 0.0
+      cutmix: 0.0
+      copy_paste: 0.0
+
+  ultralytics_defaults:
+    description: >
+      Baseline. Pass nothing, so whatever the pinned Ultralytics defaults are (mosaic, HSV jitter,
+      fliplr, translate, scale). Name this arm "Ultralytics defaults" in the paper, never "no augmentation".
+    ultralytics: {}
+
+  proposed:
+    description: >
+      Ultralytics defaults plus the gaps measured in the data: missing orientations, a missing dark tail,
+      and almost no blur. hsv_h stays at its default: class hues are narrow (cardboard 93% within 0-60 deg,
+      biodegradable 87% within 0-90 deg), so it should not grow. Mosaic stays on (default) because 90% of
+      images hold a single class and 49% a single object.
+    ultralytics:
+      # Roboflow randomised orientation on the train split only (about 70% of every processed split);
+      # this completes it for the images still in natural orientation.
+      flipud: 0.5
+    custom:
+      # Dark end missing: only 5.3% of images have mean luma < 100 against 31.7% > 200. Darkening by up to 40%
+      # at p=0.3 roughly doubles the share below 100 and keeps the median image bright (notebook section 8
+      # measures this transform alone; Ultralytics' own hsv_v jitter adds on top at train time).
+      # Contrast is left alone: it is already wide (luma std p5-p95 = 21-80).
+      - name: RandomBrightnessContrast
+        params: {brightness_limit: [-0.4, 0.05], contrast_limit: [0.0, 0.0], p: 0.3}
+      # Only 12.7% of images are soft (Laplacian variance < 100) and belts move (0.5-3 m/s in
+      # Shukhratov et al. 2024). Motion blur plus a defocus counterpart roughly double that share.
+      # The magnitude is a guess until we have belt frames to compare against.
+      - name: MotionBlur
+        params: {blur_limit: [3, 9], p: 0.15}
+      - name: GaussianBlur
+        params: {sigma_limit: [0.5, 2.0], p: 0.1}
+
+  proposed_low_saturation:
+    extends: proposed
+    description: >
+      proposed plus a weaker saturation jitter. Cardboard and biodegradable boxes are almost never colourless
+      (7% and 2%) while paper and metal mostly are (58% and 53%), so colour is what separates them, and the
+      default hsv_s of 0.7 can wash it out. A hypothesis to test, not a finding.
+    ultralytics:
+      hsv_s: 0.5
