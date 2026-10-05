@@ -1,0 +1,3 @@
+modelo,ms_medio,ms_mediana,FPS
+yolov8s_ultralytics_defaults,19.29,19.4,51.8
+yolov8n_ultralytics_defaults,10.4,9.87,96.2
