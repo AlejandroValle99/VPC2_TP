@@ -147,6 +147,37 @@ print(model.names)  # BIODEGRADABLE, CARDBOARD, GLASS, METAL, PAPER, PLASTIC
 - Only two of the four recipes were trained.
 - Confusion matrices are computed on the validation split, not on test.
 
+## Inference & Demo
+
+`notebooks/05_demo_simulated_belt.ipynb` simulates a conveyor belt without any hardware: images from
+the test split slide left to right over a belt background (1280x540, 30 FPS, 20 s), and the
+recommended model (YOLOv8s + `proposed`) runs frame by frame, drawing detections.
+
+```bash
+uv run jupyter lab   # open notebooks/05_demo_simulated_belt.ipynb and Run All
+```
+
+It needs the processed dataset (`data/processed/images/test`) and `ffmpeg` (`brew install ffmpeg`)
+to re-encode the video to H.264. Outputs go to `reports/demo/`:
+
+- `cinta_simulada_detecciones.mp4` — the demo video with detections.
+- `demo_frames.png` — six sample frames (figure used in the paper).
+- `demo_resumen_detecciones.csv` — detections and mean confidence per class.
+
+Measured on an Apple-silicon MacBook (MPS): 22.9 ms/frame on average (43.7 FPS), p95 13.3 ms.
+Detections are counted per frame, not per distinct object (tracking is future work). The demo is
+qualitative: confusions appear that the test metrics do not show, mainly METAL vs PLASTIC/PAPER/GLASS
+and unstable classes for objects cut off at the belt edge.
+
+## Paper
+
+The IEEE-format paper (LaTeX) lives in `paper/`, in two languages:
+`main_es.tex` (Spanish) and `main_en.tex` (English). Both share `references.bib` and `demo_frames.png`.
+
+```bash
+cd paper && pdflatex main_en && bibtex main_en && pdflatex main_en && pdflatex main_en
+```
+
 ## Development
 
 ```bash
@@ -179,6 +210,7 @@ from vpc2.data.processing import run_pipeline
 │   ├── 02_eda.ipynb
 │   ├── 03_augmentation_analysis.ipynb
 │   └── 04_training_colab.ipynb          # Training + evaluation on a Colab GPU
+│   └── 05_demo_simulated_belt.ipynb   # Simulated conveyor belt 
 ├── scripts/
 │   ├── process_data.py            # CLI for the data pipeline
 │   └── train_eval.py              # Fine-tune YOLO, evaluate on test, measure latency
@@ -191,6 +223,7 @@ from vpc2.data.processing import run_pipeline
 ├── tests/
 ├── reports/                       # Literature notes for the paper
 │   └── runs/                      # Training results: metrics, weights, curves (see its README)
+│   └── demo/                           # Demo video, sample frames, detections CSV
 ├── pyproject.toml
 └── README.md
 ```
