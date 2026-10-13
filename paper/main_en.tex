@@ -34,9 +34,9 @@ plastic) in order to prioritize the extraction of the materials with the highest
 value. We trained and compared four configurations -- two YOLOv8 variants (n and s) under two
 data augmentation policies -- on a dataset of 10,464 images (Garbage Classification 3,
 Roboflow). The proposed augmentation policy, designed from a quantitative analysis of the
-dataset's shortcomings (orientation, lighting and sharpness), improved mAP@0.5:0.95 by
-1.2 points (YOLOv8s) and 0.7 points (YOLOv8n) over the default Ultralytics configuration, with
-YOLOv8s + proposed reaching 0.650 mAP@0.5 and 55 FPS on a T4 GPU.
+dataset's shortcomings (orientation, lighting and sharpness), scored 1.2 points (YOLOv8s) and
+0.7 points (YOLOv8n) of mAP@0.5:0.95 above the default Ultralytics configuration in single
+training runs, with YOLOv8s + proposed reaching 0.650 mAP@0.5 and 55 FPS on a T4 GPU.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -63,8 +63,9 @@ compressed air) as a future extension.
 As a real-world precedent, Koskinopoulou et al.~\cite{koskinopoulou2021} describe a computer
 vision categorization system for the industrial robotic separation of recyclable waste,
 deployed and evaluated in a real waste processing plant under demanding industrial conditions,
-using a low-cost deep-learning-based vision module. In industry, Recycleye reports a
-deployment at the re3 materials recovery facility (MRF) in Reading, United Kingdom, with 99\%
+using a low-cost deep-learning-based vision module. In industry, the trade press reports a
+deployment of a Recycleye AI picking robot at the re3 materials recovery facility (MRF) in
+Reading, United Kingdom, with 99\%
 purity of the separated material versus 96\% on the human reference sorting line and up to 55
 picks per minute~\cite{recycleye2022}. Both precedents support the viability of a computer
 vision approach to this task, although the industry figures are not independently audited,
@@ -92,10 +93,13 @@ conveyor belt video, and that the observed class imbalance is due to the number 
 photo rather than the number of photos per class. From these findings we defined two
 configurations (\emph{arms}) to compare: \texttt{ultralytics\_defaults}, the default
 Ultralytics augmentation~\cite{ultralytics2023} (mosaic, HSV jitter, horizontal flip,
-translation and scale), and \texttt{proposed}, which adds vertical flip, darkening (brightness
-reduction of up to 40\% with probability 0.3), motion blur and Gaussian blur, to cover the
-measured gaps in orientation, lighting and sharpness, implemented with
-Albumentations~\cite{buslaev2020}. Augmentation is applied \emph{online} during training from
+translation and scale), and \texttt{proposed}, which keeps those defaults and adds vertical
+flip, darkening (brightness reduction of up to 40\% with probability 0.3), motion blur and
+Gaussian blur, to cover the measured gaps in orientation, lighting and sharpness, implemented
+with Albumentations~\cite{buslaev2020}. When custom Albumentations transforms are supplied,
+Ultralytics replaces its own built-in set (Blur, MedianBlur, ToGray and CLAHE, each with
+probability 0.01) instead of adding to it, so \texttt{proposed} also drops those four
+transforms, which \texttt{ultralytics\_defaults} keeps. Augmentation is applied \emph{online} during training from
 a single shared configuration file, so all runs use exactly the same policy and the test set
 is never augmented by accident.
 
@@ -106,16 +110,20 @@ We fine-tuned two pre-trained YOLOv8 variants~\cite{ultralytics2023} --- YOLOv8n
 model was trained for 50 epochs with batch size 16 and a fixed seed (42) on a T4 GPU (Google
 Colab). Evaluation was performed on the held-out test set, reporting mAP@0.5, mAP@0.5:0.95, F1
 and end-to-end inference latency (200 test images, processed one at a time), measured on both
-a T4 GPU and a laptop CPU (Intel i5-1135G7).
+a T4 GPU and a laptop CPU (Intel i5-1135G7). F1 is the harmonic mean of the mean precision and
+mean recall reported by Ultralytics.
 
 \section{Experimental Results and Analysis}
 
 Table~\ref{tab:metrics} summarizes the metrics of the four configurations on the test set.
-The \texttt{proposed} policy outperformed \texttt{ultralytics\_defaults} on both
-architectures: +1.2 points of mAP@0.5:0.95 for YOLOv8s and +0.7 points for YOLOv8n. The
-improvement was observed in five of the six classes on both models, with a single minor
-exception in CARDBOARD (-0.008), suggesting that the darkening and blur added by the proposed
-policy help consistently without introducing a relevant regression.
+The \texttt{proposed} policy scored higher than \texttt{ultralytics\_defaults} on both
+architectures: +1.2 points of mAP@0.5:0.95 for YOLOv8s and +0.7 points for YOLOv8n, with the
+same ordering on the validation set (+1.4 and +1.1 points). It was
+higher in five of the six classes on both models, with a single minor exception in CARDBOARD
+($-$0.008). With one training run per configuration, this
+is a consistent direction rather than a statistically tested difference. Nor can the gain be
+attributed to a specific transform: the two recipes differ in vertical flip, darkening, blur
+and the four built-in Ultralytics transforms that \texttt{proposed} drops.
 
 \begin{table}[htbp]
 \caption{Metrics by model and recipe (test set)}
@@ -142,10 +150,33 @@ difference that matters for deployment without a dedicated GPU.
 
 The recommended model is YOLOv8s with the \texttt{proposed} policy, as it has the best
 mAP@0.5:0.95 and F1 of the set and runs in real time on GPU (55~FPS). For deployment without
-a GPU we recommend YOLOv8n + \texttt{proposed} as an alternative, with a 2.4-point drop in
+a GPU we recommend YOLOv8n + \texttt{proposed} as an alternative, with a 2.5-point drop in
 mAP@0.5:0.95 in exchange for being 2.6$\times$ faster on CPU. The worst-performing classes on
 both models are BIODEGRADABLE, CARDBOARD and PAPER (mAP@0.5:0.95 between 0.36 and 0.43 for
-YOLOv8s), consistent with the visual variability of those materials.
+YOLOv8s); the next subsection examines why.
+
+\subsection{Error Analysis on the Test Set}
+
+Fig.~\ref{fig:cm} shows the confusion matrix of the recommended model on the test set at
+confidence 0.25, the threshold used at inference and in the demonstration below. Confusion between materials is rare: the largest off-diagonal entry is METAL
+predicted as PLASTIC (5.5\% of METAL objects), and no other pair exceeds 3.3\%. In particular,
+BIODEGRADABLE, CARDBOARD and PAPER are almost never mistaken for one another (at most 2.8\%,
+PAPER predicted as CARDBOARD). The dominant error is missed objects: 51\% of CARDBOARD, 42\% of
+BIODEGRADABLE and 40\% of PAPER objects are not detected, against 22--28\% for GLASS, METAL and
+PLASTIC. This matches the gap between precision (0.743) and recall (0.577) in
+Table~\ref{tab:metrics}. BIODEGRADABLE also accounts for 55\% of the false detections on
+background; it is by far the most densely annotated class, with 4,504 of the 7,452 test boxes
+(60\%). The weak classes are therefore limited by detection, not by confusion between
+materials.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\columnwidth]{test_confusion_matrix.png}
+\caption{Normalized confusion matrix of YOLOv8s + \texttt{proposed} on the test set at
+confidence 0.25 (columns: true class). The bottom row is the fraction of objects that were not
+detected; the right column distributes the false detections on background.}
+\label{fig:cm}
+\end{figure}
 
 \subsection{Demonstration on a Simulated Belt}
 
@@ -165,10 +196,9 @@ confusions, particularly METAL, can be seen.}
 \label{fig:demo}
 \end{figure*}
 
-Per-frame latency (preprocessing, inference and NMS) was 22.9~ms on average (43.7~FPS) and
-13.3~ms at the 95th percentile, running on the integrated GPU (MPS backend) of a MacBook Pro.
-That the mean exceeds the 95th percentile indicates that a few initial frames were much
-slower (device warm-up); in steady state the model stayed above the 30~FPS of the simulated
+Per-frame latency (preprocessing, inference and NMS), measured after 10 untimed warm-up frames
+on an integrated GPU (MPS backend), was 6.35~ms on average (157~FPS), with
+a median of 6.45~ms and a 95th percentile of 7.09~ms, well above the 30~FPS of the simulated
 video.
 
 \begin{table}[htbp]
@@ -194,22 +224,23 @@ Table~\ref{tab:demo} counts detections \emph{per frame}: the same object appears
 consecutive frames, so the table reflects the images that traveled along the belt and not the
 number of distinct objects (which would require tracking; see Conclusions). In the inspected
 frames we observed two behaviors. On one hand, objects with a clear appearance are classified
-with high confidence, for example the green glass bottles (0.81 to 0.89). On the other hand,
-there are confusions that the aggregate test metrics do not reveal: the same white plastic
-jug was labeled PLASTIC (0.66) in one frame and METAL (0.67) in another; a paper cup was
-labeled PAPER (0.69) and, when entering from the edge of the belt partially cropped, METAL
-(0.65); a glass jar was labeled METAL; and avocado scraps in a bowl were labeled GLASS instead
-of BIODEGRADABLE. The class becomes unstable when the object appears cut off at the edge of
-the frame, a scenario that testing on complete images does not measure. CARDBOARD was almost
-never detected (5 detections, mean confidence 0.396), consistent with its low test
-performance. These observations are qualitative and based on 11 distinct images, so they do
-not replace the quantitative evaluation of Table~\ref{tab:metrics}.
+with high confidence, for example the upright glass bottles (0.82 to 0.86). On the other hand,
+there are class confusions: the same white plastic jug was labeled PLASTIC (0.61) in one frame
+and METAL (0.66) in another; a paper cup was labeled PAPER (0.76) and, when entering from the
+edge of the belt partially cropped, METAL (0.61); a glass jar was labeled METAL; and avocado
+scraps in a bowl were labeled GLASS instead of BIODEGRADABLE. The class becomes unstable when
+the object appears cut off at the edge of the frame. CARDBOARD was almost never detected (5
+detections, mean confidence 0.396), consistent with its low test performance. These
+observations are qualitative and based on 11 distinct images, so they do not replace the
+quantitative evaluation of Table~\ref{tab:metrics}.
 
 Limitations: each model and recipe was trained only once, so the reported differences were
-not subjected to a statistical significance test. Of the four recipes defined in the
-augmentation policy, only two (\texttt{ultralytics\_defaults} and \texttt{proposed}) were
-actually trained; \texttt{no\_augmentation} and \texttt{proposed\_low\_saturation} remain as
-future work. Confusion matrices were computed on the validation set, not the test set.
+not subjected to a statistical significance test. The two recipes differ in several transforms
+at once, so the comparison does not isolate the effect of any single one, and they were
+trained with consecutive Ultralytics releases (8.4.173 for \texttt{ultralytics\_defaults} and
+8.4.172 for \texttt{proposed}). Of the four recipes defined in the augmentation policy, only two
+(\texttt{ultralytics\_defaults} and \texttt{proposed}) were actually trained;
+\texttt{no\_augmentation} and \texttt{proposed\_low\_saturation} remain as future work.
 Moreover, the dataset used, although realistic, does not fully replicate the level of visual
 clutter (overlapping objects, partial occlusions) that the specialized literature documents in
 real conveyor belt video~\cite{bashkirova2022}; validating the recommended model against our
@@ -219,8 +250,10 @@ own belt images, closer to that scenario, is a natural step before a production 
 
 \begin{enumerate}
 \item An augmentation policy designed from quantitatively measured dataset gaps (orientation,
-lighting, sharpness) consistently improves mAP@0.5:0.95 over the Ultralytics defaults, on both
-architectures evaluated, without collecting more data.
+lighting, sharpness) scored higher mAP@0.5:0.95 than the Ultralytics defaults on both
+architectures and on both validation and test, without collecting more data. With one run per
+configuration and recipes that differ in several transforms, confirming the effect and
+attributing it to specific transforms requires repeated runs and an ablation.
 
 \item YOLOv8s offers better accuracy than YOLOv8n in all six classes under both recipes, but
 at a relevant latency cost on CPU (2.6$\times$ slower than YOLOv8n), so the choice between
@@ -231,14 +264,16 @@ obtain a reliable per-class evaluation, given the imbalance detected in the orig
 partition.
 
 \item The BIODEGRADABLE, CARDBOARD and PAPER classes concentrate the lowest performance of the
-system, suggesting that visual ambiguity between organic and fiber materials is the main
-bottleneck to address in a future iteration, more than the detector architecture itself.
+system, and their main error on the test set is missed objects (40--51\% undetected at
+confidence 0.25), not confusion with other materials (at most 2.8\%). Improving recall on
+these classes, for example in densely annotated BIODEGRADABLE images, is the main bottleneck
+to address in a future iteration.
 
-\item The simulated belt demonstration ran at 43.7~FPS on an integrated GPU (MPS), above the
-30~FPS of the video, but showed confusions that the test set does not reveal, mainly METAL
-versus PLASTIC, PAPER and GLASS, and unstable classes when the object is cut off at the edge
-of the frame. This reinforces that the next step is validating with our own belt images and
-with partially visible objects.
+\item The simulated belt demonstration ran at 157~FPS on an integrated GPU
+(MPS), well above the 30~FPS of the video, but showed confusions, mainly METAL versus
+PLASTIC, PAPER and GLASS, and unstable classes when the object is cut off at the edge of the
+frame. This reinforces that the next step is validating with our own belt
+images and with partially visible objects.
 
 \item As future work, the architecture can be extended with object tracking to avoid counting
 the same item twice in video, and by directly evaluating the physical implementation of the

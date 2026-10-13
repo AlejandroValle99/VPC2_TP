@@ -12,9 +12,10 @@
 # docs) on 2026-09-23. Re-verify against the pinned version when the dependency is added.
 #
 # Caveats (from the Ultralytics docs / still to verify once it is installed):
-#   - With albumentations installed, Ultralytics also applies Blur, MedianBlur, ToGray and CLAHE at p=0.01
-#     in EVERY arm, so "no_augmentation" means "none beyond those".
-#   - Not verified: whether `augmentations=` replaces or extends that default set.
+#   - With albumentations installed, Ultralytics applies Blur, MedianBlur, ToGray and CLAHE at p=0.01 in
+#     every arm WITHOUT `custom`, so "no_augmentation" means "none beyond those".
+#   - `augmentations=` REPLACES that default set, it does not extend it (verified in the 8.4.172/8.4.173
+#     training logs, notebooks/runlogs/). Arms with `custom` therefore drop those four transforms.
 #   - `auto_augment` is ambiguous in the docs, so no arm sets it. `copy_paste` needs polygon labels and
 #     `erasing` is classification-only; this export is bbox-only, so both stay out.
 #   - Spatial transforms (e.g. RandomRotate90) move boxes correctly in Albumentations (tested in
