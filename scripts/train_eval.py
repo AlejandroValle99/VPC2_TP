@@ -3,7 +3,8 @@
 Uso (desde la raíz del repo, con data/processed ya generado):
     uv run python scripts/train_eval.py                  # entrena y evalúa
     uv run python scripts/train_eval.py --skip-train     # solo evalúa lo ya entrenado
-Entrenar requiere GPU; con CPU tardaría días.
+Entrenar requiere GPU; con CPU tardaría días. Las tablas llevan el sufijo del arm (`_<policy>`),
+así correr otra --policy no pisa las anteriores; la de latencia lleva además el hardware (--hw).
 """
 import argparse
 import time
@@ -57,6 +58,8 @@ def main():
     ap.add_argument("--epochs", type=int, default=50)
     ap.add_argument("--batch", type=int, default=16)
     ap.add_argument("--skip-train", action="store_true")
+    ap.add_argument("--hw", default="gpu" if torch.cuda.is_available() else "cpu",
+                    help="etiqueta del hardware para el archivo de latencia (p. ej. t4, cpu)")
     args = ap.parse_args()
 
     data = make_data_yaml()
@@ -71,7 +74,7 @@ def main():
                           exist_ok=True, **policy.train_kwargs())
         model = YOLO(str(RUNS / name / "weights" / "best.pt"))
         m = model.val(data=str(data), split="test", imgsz=640, plots=False)
-        p, r = m.box.mp, m.box.mr
+        p, r = m.box.mp, m.box.mr  # precision y recall medios; F1 = media armónica de ambos
         metricas.append({"modelo": name, "mAP50": round(m.box.map50, 4),
                          "mAP50-95": round(m.box.map, 4), "precision": round(p, 4),
                          "recall": round(r, 4), "F1": round(2 * p * r / (p + r), 4)})
@@ -79,9 +82,9 @@ def main():
         latencias.append({"modelo": name, **measure_latency(model)})
 
     RUNS.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(metricas).to_csv(RUNS / "tabla_metricas.csv", index=False)
-    pd.DataFrame(latencias).to_csv(RUNS / "latencia.csv", index=False)
-    pd.DataFrame(por_clase).to_csv(RUNS / "map_por_clase.csv")
+    pd.DataFrame(metricas).to_csv(RUNS / f"tabla_metricas_{args.policy}.csv", index=False)
+    pd.DataFrame(latencias).to_csv(RUNS / f"latencia_{args.hw}_{args.policy}.csv", index=False)
+    pd.DataFrame(por_clase).to_csv(RUNS / f"map_por_clase_{args.policy}.csv")
     print(pd.DataFrame(metricas), pd.DataFrame(latencias), pd.DataFrame(por_clase), sep="\n\n")
 
 

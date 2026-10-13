@@ -31,3 +31,12 @@ outputs/
 
 # Keep empty directories
 !**/.gitkeep
+
+# LaTeX build files (paper/)
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+paper/*.log

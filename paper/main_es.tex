@@ -35,9 +35,10 @@ valor de reciclaje. Se entrenaron y compararon cuatro configuraciones -- dos var
 YOLOv8 (n y s) bajo dos pol\'iticas de aumentaci\'on de datos -- sobre un conjunto de 10.464
 im\'agenes (dataset Garbage Classification 3, Roboflow). La pol\'itica de aumentaci\'on
 propuesta, dise\~nada a partir de un an\'alisis cuantitativo de las carencias del dataset
-(orientaci\'on, iluminaci\'on y nitidez), mejor\'o el mAP@0.5:0.95 en +1,2 puntos (YOLOv8s) y
-+0,7 puntos (YOLOv8n) frente a la configuraci\'on por defecto de Ultralytics, con YOLOv8s +
-proposed alcanzando 0,650 de mAP@0.5 y 55 FPS en una GPU T4.
+(orientaci\'on, iluminaci\'on y nitidez), obtuvo +1,2 puntos (YOLOv8s) y +0,7 puntos
+(YOLOv8n) de mAP@0.5:0.95 por encima de la configuraci\'on por defecto de Ultralytics en
+corridas de entrenamiento \'unicas, con YOLOv8s + proposed alcanzando 0,650 de mAP@0.5 y 55 FPS
+en una GPU T4.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -68,8 +69,9 @@ Como antecedente de un caso real, Koskinopoulou et al.~\cite{koskinopoulou2021} 
 sistema de categorizaci\'on basado en visi\'on por computadora para la separaci\'on rob\'otica
 industrial de residuos reciclables, desplegado y evaluado en una planta de procesamiento de
 residuos real, bajo condiciones industriales exigentes, utilizando un m\'odulo de visi\'on de
-bajo costo basado en deep learning. En la industria, Recycleye reporta un caso de despliegue en
-la planta de materiales recuperables (MRF) de re3 en Reading, Reino Unido, con 99\% de pureza
+bajo costo basado en deep learning. En la industria, la prensa especializada reporta el
+despliegue de un robot de separaci\'on con IA de Recycleye en la planta de materiales
+recuperables (MRF) de re3 en Reading, Reino Unido, con 99\% de pureza
 del material separado frente a 96\% en la l\'inea de separaci\'on humana de referencia y hasta
 55 extracciones por minuto~\cite{recycleye2022}. Ambos antecedentes respaldan la viabilidad de
 un enfoque de visi\'on por computadora para esta tarea, aunque las cifras de la industria no
@@ -100,10 +102,14 @@ clases observado se debe a la cantidad de objetos por foto y no a la cantidad de
 clase. A partir de esos hallazgos se definieron dos configuraciones (\emph{arms}) para
 comparar: \texttt{ultralytics\_defaults}, la aumentaci\'on por defecto de
 Ultralytics~\cite{ultralytics2023} (mosaico, jitter HSV, flip horizontal, traslaci\'on y
-escala), y \texttt{proposed}, que a\~nade flip vertical, oscurecimiento (reducci\'on de brillo
-de hasta -40\% con probabilidad 0,3), motion blur y Gaussian blur, para cubrir las carencias
-medidas de orientaci\'on, iluminaci\'on y nitidez, implementadas con
-Albumentations~\cite{buslaev2020}. La aumentaci\'on se aplica en forma \emph{online} durante el
+escala), y \texttt{proposed}, que conserva esos valores por defecto y a\~nade flip vertical,
+oscurecimiento (reducci\'on de brillo de hasta -40\% con probabilidad 0,3), motion blur y
+Gaussian blur, para cubrir las carencias medidas de orientaci\'on, iluminaci\'on y nitidez,
+implementadas con Albumentations~\cite{buslaev2020}. Cuando se le pasan transformaciones propias
+de Albumentations, Ultralytics reemplaza su conjunto integrado (Blur, MedianBlur, ToGray y
+CLAHE, cada una con probabilidad 0,01) en lugar de sumarlas, por lo que \texttt{proposed}
+tambi\'en prescinde de esas cuatro transformaciones, que \texttt{ultralytics\_defaults}
+conserva. La aumentaci\'on se aplica en forma \emph{online} durante el
 entrenamiento, a partir de un \'unico archivo de configuraci\'on compartido, de modo que todas
 las corridas usan exactamente la misma pol\'itica y el conjunto de test nunca se aumenta por
 accidente.
@@ -116,16 +122,21 @@ cuatro configuraciones entrenadas. Cada modelo se entren\'o durante 50 \'epocas,
 y semilla fija (42), sobre una GPU T4 (Google Colab). La evaluaci\'on se realiz\'o sobre el
 conjunto de test reservado, reportando mAP@0.5, mAP@0.5:0.95, F1 y latencia de inferencia
 extremo a extremo (200 im\'agenes de test, procesadas una por una), medida tanto en GPU T4 como
-en CPU de notebook (Intel i5-1135G7).
+en CPU de notebook (Intel i5-1135G7). El F1 es la media arm\'onica de la precisi\'on media y el
+recall medio que reporta Ultralytics.
 
 \section{Resultados Experimentales y An\'alisis}
 
 La Tabla~\ref{tab:metricas} resume las m\'etricas de las cuatro configuraciones sobre el
-conjunto de test. La pol\'itica \texttt{proposed} super\'o a \texttt{ultralytics\_defaults} en
-ambas arquitecturas: +1,2 puntos de mAP@0.5:0.95 en YOLOv8s y +0,7 puntos en YOLOv8n. La
-mejora se observ\'o en cinco de las seis clases en ambos modelos, con una \'unica excepci\'on
-menor en CARDBOARD (-0,008), lo que sugiere que el oscurecimiento y el desenfoque agregados por
-la pol\'itica propuesta ayudan de forma consistente sin introducir una regresi\'on relevante.
+conjunto de test. La pol\'itica \texttt{proposed} obtuvo valores m\'as altos que
+\texttt{ultralytics\_defaults} en ambas arquitecturas: +1,2 puntos de mAP@0.5:0.95 en YOLOv8s y
++0,7 puntos en YOLOv8n, con el mismo orden en el conjunto de validaci\'on (+1,4 y +1,1 puntos).
+Fue superior en cinco de las seis clases en ambos modelos, con una \'unica excepci\'on menor en
+CARDBOARD ($-$0,008). Con una sola corrida de entrenamiento por configuraci\'on, esto es una
+direcci\'on consistente y no una diferencia sometida a un test estad\'istico. Tampoco puede
+atribuirse la ganancia a una transformaci\'on en particular: las dos recetas difieren en el
+flip vertical, el oscurecimiento, el desenfoque y las cuatro transformaciones integradas de
+Ultralytics que \texttt{proposed} deja de lado.
 
 \begin{table}[htbp]
 \caption{M\'etricas por modelo y receta (conjunto de test)}
@@ -152,10 +163,35 @@ relevante para un despliegue sin GPU dedicada.
 
 El modelo recomendado es YOLOv8s con la pol\'itica \texttt{proposed}, por tener el mejor
 mAP@0.5:0.95 y F1 del conjunto y correr en tiempo real sobre GPU (55~FPS). Para un despliegue
-sin GPU se recomienda YOLOv8n + \texttt{proposed} como alternativa, con una ca\'ida de 2,4
+sin GPU se recomienda YOLOv8n + \texttt{proposed} como alternativa, con una ca\'ida de 2,5
 puntos de mAP@0.5:0.95 a cambio de ser 2,6$\times$ m\'as r\'apido en CPU. Las clases con peor
 desempe\~no en ambos modelos son BIODEGRADABLE, CARDBOARD y PAPER (mAP@0.5:0.95 entre 0,36 y
-0,43 en YOLOv8s), consistente con la variabilidad visual de esos materiales.
+0,43 en YOLOv8s); la siguiente subsecci\'on analiza por qu\'e.
+
+\subsection{An\'alisis de errores en el conjunto de test}
+
+La Fig.~\ref{fig:cm} muestra la matriz de confusi\'on del modelo recomendado sobre el conjunto
+de test con confianza 0,25, el umbral que se usa en inferencia y en la demostraci\'on que
+sigue. La confusi\'on entre materiales es poco frecuente: la mayor entrada
+fuera de la diagonal es METAL predicho como PLASTIC (5,5\% de los objetos METAL), y ning\'un
+otro par supera el 3,3\%. En particular, BIODEGRADABLE, CARDBOARD y PAPER casi nunca se
+confunden entre s\'i (como m\'aximo 2,8\%, PAPER predicho como CARDBOARD). El error dominante
+son los objetos no detectados: no se detecta el 51\% de los objetos CARDBOARD, el 42\% de
+BIODEGRADABLE y el 40\% de PAPER, frente a 22--28\% en GLASS, METAL y PLASTIC. Esto coincide
+con la brecha entre precisi\'on (0,743) y recall (0,577) de la Tabla~\ref{tab:metricas}.
+BIODEGRADABLE concentra adem\'as el 55\% de las detecciones falsas sobre el fondo; es por lejos
+la clase con anotaciones m\'as densas, con 4.504 de las 7.452 cajas de test (60\%). Las clases
+d\'ebiles est\'an limitadas, por lo tanto, por la detecci\'on y no por la confusi\'on entre
+materiales.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\columnwidth]{test_confusion_matrix.png}
+\caption{Matriz de confusi\'on normalizada de YOLOv8s + \texttt{proposed} sobre el conjunto de
+test con confianza 0,25 (columnas: clase real). La \'ultima fila es la fracci\'on de objetos no
+detectados; la \'ultima columna distribuye las detecciones falsas sobre el fondo.}
+\label{fig:cm}
+\end{figure}
 
 \subsection{Demostraci\'on sobre una cinta simulada}
 
@@ -176,11 +212,10 @@ confusiones entre clases, en particular METAL.}
 \label{fig:demo}
 \end{figure*}
 
-La latencia por cuadro (preprocesado, inferencia y NMS) fue de 22,9~ms en promedio (43,7~FPS) y
-13,3~ms en el percentil 95, ejecutando sobre la GPU integrada (backend MPS) de un MacBook Pro.
-Que el promedio supere al percentil 95 indica que unos pocos cuadros iniciales fueron mucho m\'as
-lentos (calentamiento del dispositivo); en r\'egimen estable el modelo qued\'o por encima de los
-30~FPS del video simulado.
+La latencia por cuadro (preprocesado, inferencia y NMS), medida tras 10 cuadros de
+calentamiento no cronometrados sobre la GPU integrada (backend MPS) de un Apple M5 Pro, fue de
+6,35~ms en promedio (157~FPS), con una mediana de 6,45~ms y un percentil 95 de 7,09~ms, muy por
+encima de los 30~FPS del video simulado.
 
 \begin{table}[htbp]
 \caption{Detecciones por clase en la demostraci\'on (conteo por cuadro)}
@@ -205,24 +240,25 @@ La Tabla~\ref{tab:demo} cuenta detecciones \emph{por cuadro}: un mismo objeto ap
 cuadros consecutivos, de modo que la tabla refleja las im\'agenes que recorrieron la banda y no
 la cantidad de objetos distintos (para ello har\'ia falta seguimiento, ver Conclusiones). En los
 cuadros inspeccionados se observaron dos comportamientos. Por un lado, los objetos de apariencia
-clara se clasifican con confianza alta, por ejemplo las botellas de vidrio verdes (0,81 a 0,89).
-Por otro, aparecen confusiones que las m\'etricas agregadas de test no hacen visibles: un mismo
-bid\'on pl\'astico blanco se etiquet\'o como PLASTIC (0,66) en un cuadro y como METAL (0,67) en
-otro; un vaso de papel se etiquet\'o como PAPER (0,69) y, al entrar por el borde de la banda
-parcialmente recortado, como METAL (0,65); un frasco de vidrio se etiquet\'o como METAL; y los
-restos de aguacate en un recipiente se etiquetaron como GLASS en lugar de BIODEGRADABLE. La
-clase se vuelve inestable cuando el objeto aparece cortado en el borde del encuadre, un
-escenario que el test sobre im\'agenes completas no mide. CARDBOARD casi no se detect\'o (5
+clara se clasifican con confianza alta, por ejemplo las botellas de vidrio erguidas (0,82 a
+0,86). Por otro, aparecen confusiones entre clases: un mismo bid\'on pl\'astico blanco se
+etiquet\'o como PLASTIC (0,61) en un cuadro y como METAL (0,66) en otro; un vaso de papel se
+etiquet\'o como PAPER (0,76) y, al entrar por el borde de la banda parcialmente recortado, como
+METAL (0,61); un frasco de vidrio se etiquet\'o como METAL; y los restos de aguacate en un
+recipiente se etiquetaron como GLASS en lugar de BIODEGRADABLE. La clase se vuelve inestable
+cuando el objeto aparece cortado en el borde del encuadre. CARDBOARD casi no se detect\'o (5
 detecciones, confianza media 0,396), coherente con su bajo desempe\~no en test. Estas
 observaciones son cualitativas y se basan en 11 im\'agenes distintas, por lo que no sustituyen la
 evaluaci\'on cuantitativa de la Tabla~\ref{tab:metricas}.
 
 Limitaciones: cada modelo y receta se entren\'o una \'unica vez, por lo que las diferencias
-reportadas no fueron sometidas a un test de significancia estad\'istica. De las cuatro recetas
-definidas en la pol\'itica de aumentaci\'on, solo dos (\texttt{ultralytics\_defaults} y
-\texttt{proposed}) fueron efectivamente entrenadas; \texttt{no\_augmentation} y
-\texttt{proposed\_low\_saturation} quedan como trabajo futuro. Las matrices de confusi\'on se
-calcularon sobre el conjunto de validaci\'on, no sobre el de test. Adem\'as, el dataset
+reportadas no fueron sometidas a un test de significancia estad\'istica. Las dos recetas
+difieren en varias transformaciones a la vez, por lo que la comparaci\'on no a\'isla el efecto
+de ninguna en particular, y se entrenaron con versiones consecutivas de Ultralytics (8.4.173
+para \texttt{ultralytics\_defaults} y 8.4.172 para \texttt{proposed}). De las cuatro recetas definidas en la pol\'itica de aumentaci\'on, solo dos
+(\texttt{ultralytics\_defaults} y \texttt{proposed}) fueron efectivamente entrenadas;
+\texttt{no\_augmentation} y \texttt{proposed\_low\_saturation} quedan como trabajo futuro.
+Adem\'as, el dataset
 utilizado, aunque realista, no replica completamente el nivel de desorden visual (objetos
 superpuestos, oclusiones parciales) que literatura especializada documenta en video real de
 cintas transportadoras~\cite{bashkirova2022}; validar el modelo recomendado contra im\'agenes
@@ -233,9 +269,11 @@ despliegue productivo.
 
 \begin{enumerate}
 \item Una pol\'itica de aumentaci\'on dise\~nada a partir de carencias medidas
-cuantitativamente en el dataset (orientaci\'on, iluminaci\'on, nitidez) mejora el
-mAP@0.5:0.95 de forma consistente frente a los valores por defecto de Ultralytics, en ambas
-arquitecturas evaluadas, sin necesidad de recolectar m\'as datos.
+cuantitativamente en el dataset (orientaci\'on, iluminaci\'on, nitidez) obtuvo un
+mAP@0.5:0.95 m\'as alto que los valores por defecto de Ultralytics en ambas arquitecturas y
+tanto en validaci\'on como en test, sin necesidad de recolectar m\'as datos. Con una corrida
+por configuraci\'on y recetas que difieren en varias transformaciones, confirmar el efecto y
+atribuirlo a transformaciones espec\'ificas requiere corridas repetidas y una ablaci\'on.
 
 \item YOLOv8s ofrece mejor precisi\'on que YOLOv8n en las seis clases bajo ambas recetas, pero
 a un costo de latencia relevante en CPU (2,6$\times$ m\'as lento que YOLOv8n), por lo que la
@@ -247,12 +285,13 @@ para obtener una evaluaci\'on por clase confiable, dado el desbalance detectado 
 partici\'on original.
 
 \item Las clases BIODEGRADABLE, CARDBOARD y PAPER concentran el menor desempe\~no del sistema,
-lo que sugiere que la ambig\"uedad visual entre materiales org\'anicos y de fibra es el cuello
-de botella principal a resolver en una futura iteraci\'on, m\'as que la arquitectura del
-detector en s\'i.
+y su error principal en test son los objetos no detectados (40--51\% sin detectar con
+confianza 0,25), no la confusi\'on con otros materiales (como m\'aximo 2,8\%). Mejorar el
+recall de estas clases, por ejemplo en las im\'agenes de BIODEGRADABLE con anotaciones densas,
+es el cuello de botella principal a resolver en una futura iteraci\'on.
 
-\item La demostraci\'on sobre una cinta simulada corri\'o a 43,7~FPS en una GPU integrada (MPS),
-por encima de los 30~FPS del video, pero mostr\'o confusiones que el test no revela, sobre todo
+\item La demostraci\'on sobre una cinta simulada corri\'o a 157~FPS en una GPU integrada (Apple
+M5 Pro, MPS), muy por encima de los 30~FPS del video, pero mostr\'o confusiones, sobre todo
 METAL frente a PLASTIC, PAPER y GLASS, y clases inestables cuando el objeto queda cortado en el
 borde del encuadre. Esto refuerza que el siguiente paso es validar con im\'agenes propias de la
 banda y con objetos parcialmente visibles.

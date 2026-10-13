@@ -16,7 +16,7 @@ dependencies = [
     "ipykernel>=6.29",
     "pyyaml>=6.0",
     "albumentations>=2.0.8",
-    "ultralytics>=8.4.172",
+    "ultralytics==8.4.172",
     "pandas>=3.0.6",
 ]
 

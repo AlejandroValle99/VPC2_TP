@@ -99,7 +99,7 @@ Outputs go to `reports/runs/` (see its README).
 | Recipe | What it is |
 |---|---|
 | `ultralytics_defaults` | Baseline: Ultralytics' own default augmentation (mosaic, HSV jitter, horizontal flip, translate, scale). |
-| `proposed` | The defaults plus vertical flip, darkening (brightness down to -40%), motion blur and Gaussian blur, chosen from gaps measured in the data (see notebook 03). |
+| `proposed` | The default hyperparameters plus vertical flip, darkening (brightness down to -40%), motion blur and Gaussian blur, chosen from gaps measured in the data (see notebook 03). Passing custom transforms through `augmentations=` replaces Ultralytics' built-in Albumentations set (Blur, MedianBlur, ToGray, CLAHE at p=0.01), so `proposed` drops those four, which the baseline keeps. |
 
 `no_augmentation` and `proposed_low_saturation` are defined in `configs/augmentation.yaml` but have not been trained.
 
@@ -114,17 +114,22 @@ Outputs go to `reports/runs/` (see its README).
 
 Latency is end to end per image (one at a time, 200 test images). On a laptop CPU (Intel
 i5-1135G7, measured on the `proposed` weights): YOLOv8n 68.9 ms (14.5 FPS), YOLOv8s 177.3 ms
-(5.6 FPS). Per-class values and all differences: `reports/runs/comparacion_recetas.csv`.
+(5.6 FPS). Latency depends on the architecture, not on the recipe: the gap between recipes is
+noise between two Colab sessions. F1 is the harmonic mean of the mean precision and mean recall.
+Per-class values and all differences: `reports/runs/comparacion_recetas.csv`.
 
-- `proposed` beats the baseline by +1.2 (YOLOv8s) and +0.7 (YOLOv8n) points of mAP@0.5:0.95.
-  It improves five of six classes in both models and is slightly worse on CARDBOARD (-0.008).
+- `proposed` scores +1.2 (YOLOv8s) and +0.7 (YOLOv8n) points of mAP@0.5:0.95 over the baseline,
+  and also leads on validation in both models. It is higher in five of six classes in both models
+  and slightly lower on CARDBOARD (-0.008). With one run per configuration this is a consistent
+  direction, not a tested difference, and it cannot be attributed to a single transform because
+  the recipes differ in several (see the table above).
 - YOLOv8s beats YOLOv8n in all six classes under both recipes.
 
 ### Recommended model: YOLOv8s + `proposed`
 
 Weights: `reports/runs/yolov8s_proposed/weights/best.pt`. It has the best mAP@0.5:0.95 and F1 of
 the four trained models and runs in real time on a T4 GPU (55 FPS). If the demo has no GPU, use
-`reports/runs/yolov8n_proposed/weights/best.pt` (about 2.6 times faster on CPU, 2.4 points lower
+`reports/runs/yolov8n_proposed/weights/best.pt` (about 2.6 times faster on CPU, 2.5 points lower
 mAP@0.5:0.95).
 
 ```python
@@ -137,7 +142,9 @@ print(model.names)  # BIODEGRADABLE, CARDBOARD, GLASS, METAL, PAPER, PLASTIC
 
 `BoxF1_curve.png` in each run folder shows the F1 for every confidence threshold, useful to tune
 `conf`. Expect the weakest detections on BIODEGRADABLE, CARDBOARD and PAPER (mAP@0.5:0.95 of
-0.36 to 0.43 in YOLOv8s).
+0.36 to 0.43 in YOLOv8s). On the test split at `conf=0.25`
+(`reports/runs/yolov8s_proposed/test_confusion_matrix_normalized.png`), their main error is
+missed objects (40-51% undetected), not confusion with other classes (at most 2.8%).
 
 ### Limitations
 
@@ -145,7 +152,11 @@ print(model.names)  # BIODEGRADABLE, CARDBOARD, GLASS, METAL, PAPER, PLASTIC
   significance.
 - The `ultralytics_defaults` runs used ultralytics 8.4.173 and the `proposed` runs 8.4.172.
 - Only two of the four recipes were trained.
-- Confusion matrices are computed on the validation split, not on test.
+- All four runs reach their best validation mAP@0.5:0.95 at epoch 49 or 50, so they were still
+  improving at the end of training; a longer schedule could change the comparison.
+- The `confusion_matrix*.png` saved during training are on the validation split and, like any
+  Ultralytics validation, at `conf=0.001`, which inflates confusions and background false
+  positives. The `test_confusion_matrix*.png` files are on test at `conf=0.25`.
 
 ## Inference & Demo
 
@@ -163,11 +174,13 @@ to re-encode the video to H.264. Outputs go to `reports/demo/`:
 - `cinta_simulada_detecciones.mp4` — the demo video with detections.
 - `demo_frames.png` — six sample frames (figure used in the paper).
 - `demo_resumen_detecciones.csv` — detections and mean confidence per class.
+- `demo_latencia.csv` — per-frame latency (mean, median, p95) after 10 untimed warm-up frames.
 
-Measured on an Apple-silicon MacBook (MPS): 22.9 ms/frame on average (43.7 FPS), p95 13.3 ms.
-Detections are counted per frame, not per distinct object (tracking is future work). The demo is
-qualitative: confusions appear that the test metrics do not show, mainly METAL vs PLASTIC/PAPER/GLASS
-and unstable classes for objects cut off at the belt edge.
+Measured on an Apple M5 Pro (MPS): 6.35 ms/frame on average (157 FPS), median 6.45 ms, p95
+7.09 ms. Detections are counted per frame, not per distinct object (tracking is future work). The
+demo is qualitative: the same objects classified correctly when fully visible are labeled METAL
+when cut off at the belt edge, an effect the aggregate test metrics do not isolate (on test,
+at most 3.3% of PLASTIC, PAPER or GLASS objects are predicted as METAL).
 
 ## Paper
 
