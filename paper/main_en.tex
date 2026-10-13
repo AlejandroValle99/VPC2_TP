@@ -197,7 +197,7 @@ confusions, particularly METAL, can be seen.}
 \end{figure*}
 
 Per-frame latency (preprocessing, inference and NMS), measured after 10 untimed warm-up frames
-on the integrated GPU (MPS backend) of an Apple M5 Pro, was 6.35~ms on average (157~FPS), with
+on an integrated GPU (MPS backend), was 6.35~ms on average (157~FPS), with
 a median of 6.45~ms and a 95th percentile of 7.09~ms, well above the 30~FPS of the simulated
 video.
 
@@ -269,8 +269,8 @@ confidence 0.25), not confusion with other materials (at most 2.8\%). Improving 
 these classes, for example in densely annotated BIODEGRADABLE images, is the main bottleneck
 to address in a future iteration.
 
-\item The simulated belt demonstration ran at 157~FPS on an integrated GPU (Apple M5 Pro,
-MPS), well above the 30~FPS of the video, but showed confusions, mainly METAL versus
+\item The simulated belt demonstration ran at 157~FPS on an integrated GPU
+(MPS), well above the 30~FPS of the video, but showed confusions, mainly METAL versus
 PLASTIC, PAPER and GLASS, and unstable classes when the object is cut off at the edge of the
 frame. This reinforces that the next step is validating with our own belt
 images and with partially visible objects.

@@ -52,8 +52,6 @@ Outputs:
 - `data/processed/data.yaml` — Ultralytics config (train / val / **held-out test**)
 - `data/processed/images/{train,val,test}/` and matching `labels/`
 
-Do not augment the test split.
-
 ## Augmentation
 
 Augmentation is applied **online, during training**, from one shared policy file, so every
@@ -72,9 +70,6 @@ from vpc2.data.augmentation import load_policy
 policy = load_policy("proposed")
 model.train(data="data/processed/data.yaml", **policy.train_kwargs())
 ```
-
-Name the baseline arm "Ultralytics defaults" (Ultralytics augments by default), not "no
-augmentation".
 
 ## Training & Evaluation
 
@@ -96,21 +91,21 @@ Outputs go to `reports/runs/` (see its README).
 
 ### Augmentation recipes trained
 
-| Recipe | What it is |
-|---|---|
-| `ultralytics_defaults` | Baseline: Ultralytics' own default augmentation (mosaic, HSV jitter, horizontal flip, translate, scale). |
-| `proposed` | The default hyperparameters plus vertical flip, darkening (brightness down to -40%), motion blur and Gaussian blur, chosen from gaps measured in the data (see notebook 03). Passing custom transforms through `augmentations=` replaces Ultralytics' built-in Albumentations set (Blur, MedianBlur, ToGray, CLAHE at p=0.01), so `proposed` drops those four, which the baseline keeps. |
+| Recipe                 | What it is                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ultralytics_defaults` | Baseline: Ultralytics' own default augmentation (mosaic, HSV jitter, horizontal flip, translate, scale).                                                                                                                                                                                                                                                                                 |
+| `proposed`             | The default hyperparameters plus vertical flip, darkening (brightness down to -40%), motion blur and Gaussian blur, chosen from gaps measured in the data (see notebook 03). Passing custom transforms through `augmentations=` replaces Ultralytics' built-in Albumentations set (Blur, MedianBlur, ToGray, CLAHE at p=0.01), so `proposed` drops those four, which the baseline keeps. |
 
 `no_augmentation` and `proposed_low_saturation` are defined in `configs/augmentation.yaml` but have not been trained.
 
 ### Results (test split, 50 epochs, seed 42)
 
-| Model | Recipe | mAP@0.5 | mAP@0.5:0.95 | F1 | Latency (Colab T4) |
-|---|---|---|---|---|---|
-| YOLOv8s | proposed | 0.650 | 0.467 | 0.650 | 18.1 ms (55 FPS) |
-| YOLOv8s | ultralytics_defaults | 0.645 | 0.455 | 0.646 | 19.3 ms (52 FPS) |
-| YOLOv8n | proposed | 0.629 | 0.443 | 0.625 | 10.2 ms (98 FPS) |
-| YOLOv8n | ultralytics_defaults | 0.622 | 0.435 | 0.617 | 10.4 ms (96 FPS) |
+| Model   | Recipe               | mAP@0.5 | mAP@0.5:0.95 | F1    | Latency (Colab T4) |
+| ------- | -------------------- | ------- | ------------ | ----- | ------------------ |
+| YOLOv8s | proposed             | 0.650   | 0.467        | 0.650 | 18.1 ms (55 FPS)   |
+| YOLOv8s | ultralytics_defaults | 0.645   | 0.455        | 0.646 | 19.3 ms (52 FPS)   |
+| YOLOv8n | proposed             | 0.629   | 0.443        | 0.625 | 10.2 ms (98 FPS)   |
+| YOLOv8n | ultralytics_defaults | 0.622   | 0.435        | 0.617 | 10.4 ms (96 FPS)   |
 
 Latency is end to end per image (one at a time, 200 test images). On a laptop CPU (Intel
 i5-1135G7, measured on the `proposed` weights): YOLOv8n 68.9 ms (14.5 FPS), YOLOv8s 177.3 ms
@@ -176,7 +171,7 @@ to re-encode the video to H.264. Outputs go to `reports/demo/`:
 - `demo_resumen_detecciones.csv` — detections and mean confidence per class.
 - `demo_latencia.csv` — per-frame latency (mean, median, p95) after 10 untimed warm-up frames.
 
-Measured on an Apple M5 Pro (MPS): 6.35 ms/frame on average (157 FPS), median 6.45 ms, p95
+Measured on MPS (Apple-silicon GPU): 6.35 ms/frame on average (157 FPS), median 6.45 ms, p95
 7.09 ms. Detections are counted per frame, not per distinct object (tracking is future work). The
 demo is qualitative: the same objects classified correctly when fully visible are labeled METAL
 when cut off at the belt edge, an effect the aggregate test metrics do not isolate (on test,
@@ -223,7 +218,7 @@ from vpc2.data.processing import run_pipeline
 │   ├── 02_eda.ipynb
 │   ├── 03_augmentation_analysis.ipynb
 │   └── 04_training_colab.ipynb          # Training + evaluation on a Colab GPU
-│   └── 05_demo_simulated_belt.ipynb   # Simulated conveyor belt 
+│   └── 05_demo_simulated_belt.ipynb   # Simulated conveyor belt
 ├── scripts/
 │   ├── process_data.py            # CLI for the data pipeline
 │   └── train_eval.py              # Fine-tune YOLO, evaluate on test, measure latency

@@ -213,7 +213,7 @@ confusiones entre clases, en particular METAL.}
 \end{figure*}
 
 La latencia por cuadro (preprocesado, inferencia y NMS), medida tras 10 cuadros de
-calentamiento no cronometrados sobre la GPU integrada (backend MPS) de un Apple M5 Pro, fue de
+calentamiento no cronometrados sobre una GPU integrada (backend MPS), fue de
 6,35~ms en promedio (157~FPS), con una mediana de 6,45~ms y un percentil 95 de 7,09~ms, muy por
 encima de los 30~FPS del video simulado.
 
@@ -290,8 +290,8 @@ confianza 0,25), no la confusi\'on con otros materiales (como m\'aximo 2,8\%). M
 recall de estas clases, por ejemplo en las im\'agenes de BIODEGRADABLE con anotaciones densas,
 es el cuello de botella principal a resolver en una futura iteraci\'on.
 
-\item La demostraci\'on sobre una cinta simulada corri\'o a 157~FPS en una GPU integrada (Apple
-M5 Pro, MPS), muy por encima de los 30~FPS del video, pero mostr\'o confusiones, sobre todo
+\item La demostraci\'on sobre una cinta simulada corri\'o a 157~FPS en una GPU integrada
+(MPS), muy por encima de los 30~FPS del video, pero mostr\'o confusiones, sobre todo
 METAL frente a PLASTIC, PAPER y GLASS, y clases inestables cuando el objeto queda cortado en el
 borde del encuadre. Esto refuerza que el siguiente paso es validar con im\'agenes propias de la
 banda y con objetos parcialmente visibles.
